@@ -1,0 +1,261 @@
+name: adaptive-cpp
+arch: amd64
+platform: linux
+version: $VERSION
+version_schema: none # semver
+epoch: $EPOCH
+section: devel
+maintainer: Vasyl Zaichenko <skynetvasyl@gmail.com>
+description: AdaptiveCpp toolchain for C++ development
+vendor: AdaptiveCpp
+homepage: https://adaptivecpp.github.io/
+license: BSD-2-Clause
+
+# Changelog YAML file, see: https://github.com/goreleaser/chglog
+changelog: "changelog.yaml"
+
+disable_globbing: false
+provides:
+  - llvm
+  - acpp
+
+recommends:
+  - cuda-toolkit-12
+
+contents:
+  - src: ${LVM_ROOT}/
+    dst: ${LVM_ROOT}/
+    type: tree
+
+  # Sometimes it is important to be able to set the mtime, mode, owner, or group for a file
+  # that differs from what is on the local build system at build time. The owner (if different
+  # than 'root') has to be always specified manually in 'file_info' as it will not be copied
+  # from the 'src' file.
+  - src: path/to/foo
+    dst: /usr/share/foo
+    file_info:
+      # Make sure that the mode is specified in octal, e.g. 0644 instead of 644.
+      mode: 0644
+      mtime: 2008-01-02T15:04:05Z
+      owner: notRoot
+      group: notRoot
+
+  # Using the type 'dir', empty directories can be created. When building RPMs, however, this
+  # type has another important purpose: Claiming ownership of that folder. This is important
+  # because when upgrading or removing an RPM package, only the directories for which it has
+  # claimed ownership are removed. However, you should not claim ownership of a folder that
+  # is created by the distro or a dependency of your package.
+  # A directory in the build environment can optionally be provided in the 'src' field in
+  # order copy mtime and mode from that directory without having to specify it manually.
+  - dst: /some/dir
+    type: dir
+    file_info:
+      mode: 0700
+
+  # Using `expand: true`, environment variables will be expanded in both
+  # src and dst.
+  - dst: /usr/local/bin/${NAME}
+    src: "${NAME}"
+    expand: true
+
+# Umask to be used on files without explicit mode set.
+#
+# By default, nFPM will inherit the mode of the original file that's being
+# added.
+# This may lead to issues if these files are checkout out in Git, for example,
+# as it won't keep all the permissions on fresh checkouts, or if the local
+# system has a problematic umask setting.
+#
+# This setting allows to set the umask for all files that are added to the
+# package without a specific file_info.mode set.
+#
+# Default: 0o002 (will remove world-writable permissions)
+umask: 0o002
+
+# Scripts to run at specific stages. (overridable)
+scripts:
+  preinstall: ./scripts/preinstall.sh
+  postinstall: ./scripts/postinstall.sh
+  preremove: ./scripts/preremove.sh
+  postremove: ./scripts/postremove.sh
+
+# All fields above marked as `overridable` can be overridden for a given
+# package format in this section.
+overrides:
+  # The depends override can for example be used to provide version
+  # constraints for dependencies where different package formats use different
+  # versions or for dependencies that are named differently.
+  deb:
+    depends:
+      - baz (>= 1.2.3-0)
+      - some-lib-dev
+    # ...
+  rpm:
+    depends:
+      - baz >= 1.2.3-0
+      - some-lib-devel
+    # ...
+  apk:
+    # ...
+  archlinux:
+    depends:
+      - baz
+      - some-lib
+
+# Custom configuration applied only to the RPM packager.
+rpm:
+  # rpm specific architecture name that overrides "arch" without performing any
+  # replacements.
+  arch: ia64
+
+  # RPM specific scripts.
+  scripts:
+    # The pretrans script runs before all RPM package transactions / stages.
+    pretrans: ./scripts/pretrans.sh
+    # The posttrans script runs after all RPM package transactions / stages.
+    posttrans: ./scripts/posttrans.sh
+    # The verify script runs when verifying packages using `rpm -V`.
+    verify: ./scripts/verify.sh
+
+  # The package group. This option is deprecated by most distros
+  # but required by old distros like CentOS 5 / EL 5 and earlier.
+  group: Unspecified
+
+  # The package summary. This is, by default, the first line of the
+  # description, but can be explicitly provided here.
+  summary: Explicit summary for the package
+
+  # The packager is used to identify the organization that actually packaged
+  # the software, as opposed to the author of the software.
+  # `maintainer` will be used as fallback if not specified.
+  # This will expand any env var you set in the field, e.g. packager: ${PACKAGER}
+  packager: GoReleaser <staff@goreleaser.com>
+
+  # Compression algorithm (gzip (default), zstd, lzma or xz).
+  compression: zstd
+
+  # Prefixes for relocatable packages.
+  prefixes:
+    - /usr/bin
+
+  # The package is signed if a key_file is set
+  signature:
+    # PGP secret key (can also be ASCII-armored), the passphrase is taken
+    # from the environment variable $NFPM_RPM_PASSPHRASE with a fallback
+    # to $NFPM_PASSPHRASE.
+    # This will expand any env var you set in the field, e.g. key_file: ${SIGNING_KEY_FILE}
+    key_file: key.gpg
+
+    # PGP secret key id in hex format, if it is not set it will select the first subkey
+    # that has the signing flag set. You may need to set this if you want to use the primary key as the signing key
+    # or to support older versions of RPM < 4.13.0 which cannot validate a signed RPM that used a subkey to sign
+    # This will expand any env var you set in the field, e.g. key_id: ${RPM_SIGNING_KEY_ID}
+    key_id: bc8acdd415bd80b3
+
+# Custom configuration applied only to the Deb packager.
+deb:
+  # deb specific architecture name that overrides "arch" without performing any replacements.
+  arch: arm
+
+  # Custom deb special files.
+  scripts:
+    # Deb rules script.
+    rules: foo.sh
+
+    # Deb templates file, when using debconf.
+    templates: templates
+
+    # Deb config maintainer script for asking questions when using debconf.
+    config: config
+
+  # Custom deb triggers
+  triggers:
+    # register interest on a trigger activated by another package
+    # (also available: interest_await, interest_noawait)
+    interest:
+      - some-trigger-name
+
+    # activate a trigger for another package
+    # (also available: activate_await, activate_noawait)
+    activate:
+      - another-trigger-name
+
+  # Packages which would break if this package would be installed.
+  # The installation of this package is blocked if `some-package`
+  # is already installed.
+  breaks:
+    - some-package
+
+  # Compression algorithm (gzip (default), zstd, xz or none).
+  compression: zstd
+
+  # The package is signed if a key_file is set
+  signature:
+    # Signature method, either "dpkg-sig" or "debsign".
+    # Defaults to "debsign"
+    # "dpkg-sig" is not supported in newer Debian versions.
+    method: dpkg-sig
+
+    # PGP secret key (can also be ASCII-armored). The passphrase is taken
+    # from the environment variable $NFPM_DEB_PASSPHRASE with a fallback
+    # to $NFPM_PASSPHRASE.
+    # This will expand any env var you set in the field, e.g. key_file: ${SIGNING_KEY_FILE}
+    key_file: key.gpg
+
+    # The type describes the signers role, possible values are "origin",
+    # "maint" and "archive". If unset, the type defaults to "origin".
+    type: origin
+
+    # PGP secret key id in hex format, if it is not set it will select the first subkey
+    # that has the signing flag set. You may need to set this if you want to use the primary key as the signing key
+    # This will expand any env var you set in the field, e.g. key_id: ${DEB_SIGNING_KEY_ID}
+    key_id: bc8acdd415bd80b3
+
+  # Additional fields for the control file. Empty fields are ignored.
+  # This will expand any env vars you set in the field values, e.g. Vcs-Browser: ${CI_PROJECT_URL}
+  fields:
+    Bugs: https://github.com/goreleaser/nfpm/issues
+
+  # The Debian-specific "predepends" field can be used to ensure the complete installation of a list of
+  # packages (including unpacking, pre- and post installation scripts) prior to the installation of the
+  # built package.
+  predepends:
+    - baz (>= 1.2.3-0)
+
+apk:
+  # apk specific architecture name that overrides "arch" without performing any replacements.
+  arch: armhf
+
+  # The package is signed if a key_file is set
+  signature:
+    # RSA private key in the PEM format. The passphrase is taken from
+    # the environment variable $NFPM_APK_PASSPHRASE with a fallback
+    # to $NFPM_PASSPHRASE.
+    # This will expand any env var you set in the field, e.g. key_file: ${SIGNING_KEY_FILE}
+    key_file: key.gpg
+
+    # The name of the signing key. When verifying a package, the signature
+    # is matched to the public key store in /etc/apk/keys/<key_name>.rsa.pub.
+    # If unset, it defaults to the maintainer email address.
+    key_name: origin
+
+    # APK does not use pgp keys, so the key_id field is ignored.
+    key_id: ignored
+
+archlinux:
+  # This value is used to specify the name used to refer to a group
+  # of packages when building a split package. Defaults to name
+  # See: https://wiki.archlinux.org/title/PKGBUILD#pkgbase
+  pkgbase: bar
+
+  # The packager identifies the organization packaging the software
+  # rather than the developer. Defaults to "Unknown Packager".
+  packager: GoReleaser <staff@goreleaser.com>
+
+  # Arch Linux specific scripts.
+  scripts:
+    # The preupgrade script runs before pacman upgrades the package
+    preupgrade: ./scripts/preupgrade.sh
+
+    # The postupgrade script runs after pacman upgrades the package
+    postupgrade: ./scripts/postupgrade.sh

@@ -1,0 +1,42 @@
+ARG TAG="24.04"
+FROM ubuntu:${TAG} AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get full-upgrade -y
+
+RUN echo "$(apt search gcc 2>/dev/null | grep -E -i '^gcc-([0-9]{2}/)' | awk -F'/' '{print $1}' | awk -F'-' '{print $2}' | sort -r | head -n1)" > /tmp/gcc_version
+
+RUN apt-get install -y \
+    --no-install-recommends \
+    gnupg \
+    curl \
+    wget \
+    git \
+    pkg-config \
+    build-essential \
+    gcc-$(cat /tmp/gcc_version) \
+    g++-$(cat /tmp/gcc_version) \
+    libcurl4-openssl-dev \
+    libxml2-dev \
+    libedit-dev \
+    zip \
+    unzip \
+    libzstd-dev \
+    zlib1g-dev \
+    cmake \
+    ninja-build \
+    automake \
+    autoconf \
+    autoconf-archive \
+    python3 \
+    python3-pip \
+    python3-setuptools
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-$(cat /tmp/gcc_version) 100 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-$(cat /tmp/gcc_version) 100 && \
+    rm -rf /tmp/gcc_version && rm -rf /var/lib/apt/lists/*
+
+ENV CC=/usr/bin/gcc
+ENV CXX=/usr/bin/g++
