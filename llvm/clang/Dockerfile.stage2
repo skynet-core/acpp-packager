@@ -1,0 +1,25 @@
+ARG LLVM_BUILDER_TAG="ubuntu-24.04"
+ARG LLVM_VERSION="18.1.8"
+FROM smartcoder/llvm-clang-stage1:${LLVM_VERSION}-${LLVM_BUILDER_TAG} AS builder
+ARG LLVM_VERSION
+
+WORKDIR /tmp
+
+RUN git clone --depth 1 --branch "llvmorg-${LLVM_VERSION}" https://github.com/llvm/llvm-project
+
+WORKDIR /tmp/llvm-project
+
+ENV LLVM_ROOT_STAGE2="/opt/stage2/llvm-${LLVM_VERSION}"
+#     -DCLANG_RESOURCE_DIR=/opt/stage2/llvm-${LLVM_VERSION}/include/clang \
+# -DCLANG_RESOURCE_DIR=/opt/stage1/llvm-${LLVM_VERSION}/lib/clang/"$(echo ${LLVM_VERSION} | cut -d '.' -f1)"/include \
+RUN cmake -G Ninja \
+    -DCMAKE_C_COMPILER=/usr/bin/clang \
+    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+    -DLLVM_ENABLE_PROJECTS="clang" \
+    -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
+    -DLLVM_TARGETS_TO_BUILD=X86 \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=${LLVM_ROOT_STAGE2}/lib \
+    -DLLVM_USE_LINKER=lld \
+    -DLLVM_ENABLE_LTO=Thin \
+    -B build -S llvm

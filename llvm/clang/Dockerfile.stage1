@@ -32,24 +32,22 @@ ENV LLVM_ROOT_STAGE1="/opt/stage1/llvm-${LLVM_VERSION}"
 # LLD_BUILD_TOOLS=ON
 # LLD_DEFAULT_LD_LLD_IS_MINGW=OFF
 
-
-RUN cmake -S ./llvm -B build \
+RUN cmake -G Ninja -S ./llvm -B build \
     -DCMAKE_C_COMPILER=/usr/bin/gcc \
     -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_FLAGS="-Wno-error=deprecated-declarations" \
     -DCMAKE_INSTALL_PREFIX=$LLVM_ROOT_STAGE1 \
     -DLLVM_ENABLE_PROJECTS="clang;lld" \
-    -DOPENMP_ENABLE_LIBOMPTARGET=OFF \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
-    -DCMAKE_INSTALL_RPATH=$LLVM_ROOT_STAGE1/lib \
+    -DCMAKE_INSTALL_RPATH=${LLVM_ROOT_STAGE1}/lib \
     -DLLVM_TARGETS_TO_BUILD=X86 \
     -DLLVM_ENABLE_OCAMLDOC=OFF \
     -DLLVM_ENABLE_BINDINGS=OFF \
     -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=OFF \
     -DLLVM_BUILD_LLVM_DYLIB=ON \
     -DLLVM_ENABLE_DUMP=OFF \
-    -DLLVM_PARALLEL_LINK_JOBS=1 \
     -DLLVM_ENABLE_LTO=on \
     -DLLVM_USE_SPLIT_DWARF=ON \
     -DLLVM_OPTIMIZED_TABLEGEN=ON \
@@ -57,10 +55,14 @@ RUN cmake -S ./llvm -B build \
     -DLLVM_USE_LINKER=gold \
     -DLLVM_ENABLE_MODULES=OFF \
     -DLLVM_ENABLE_EH=ON \
-    -DLLVM_ENABLE_RUNTIMES=compiler-rt
+    -DLLVM_ENABLE_RUNTIMES=""
 
 
-RUN cmake --build build
+RUN cmake --build build --target clang --parallel $(nproc)
+RUN cmake --build build --target lld --parallel $(nproc)
 RUN cmake --install build
 
 RUN rm -rf /tmp/llvm-project
+
+RUN update-alternatives --install /usr/bin/clang clang ${LLVM_ROOT_STAGE1}/bin/clang 100 && \
+    update-alternatives --install /usr/bin/clang++ clang++ ${LLVM_ROOT_STAGE1}/bin/clang++ 100
